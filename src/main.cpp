@@ -3,6 +3,9 @@
 #include <sstream>
 #include <iostream>
 #include <math.h>
+#include <vector>
+
+#define M_PI 3.14159265358979323846
 
 void framebuffer_size_callback(GLFWwindow *window, int width, int height);
 void processInput(GLFWwindow *window);
@@ -11,9 +14,10 @@ const char *APP_TITLE = "My first OpenGL Triangle";
 GLFWwindow *window;
 
 // settings
-const unsigned int SCR_WIDTH = 800;
-const unsigned int SCR_HEIGHT = 600;
-unsigned int VBO_FIRST_TRIANGLE, VAO_FIRST_TRIANGLE, VBO_SECOND_TRIANGLE, VAO_SECOND_TRIANGLE;
+const unsigned int SCR_WIDTH = 1800;
+const unsigned int SCR_HEIGHT = 800;
+const int numPoints = 800;
+unsigned int VBO, VAO;
 int shaderProgram, fragmentShader;
 
 const char *vertexShaderSource = "#version 330 core\n"
@@ -23,6 +27,7 @@ const char *vertexShaderSource = "#version 330 core\n"
                                  "void main()\n"
                                  "{\n"
                                  "   gl_Position = vec4(aPos, 1.0);\n"
+                                 "   gl_PointSize = 5.0; \n"
                                  "   vertexColor = aColor;\n"
                                  "}\0";
 const char *fragmentShaderSource = "#version 330 core\n"
@@ -30,7 +35,7 @@ const char *fragmentShaderSource = "#version 330 core\n"
                                    "out vec4 FragColor;\n"
                                    "void main()\n"
                                    "{\n"
-                                   "   FragColor = vec4(1.0, 1.0, 0.0 ,1.0);\n"
+                                   "   FragColor = vec4(vertexColor,1.0);\n"
                                    "}\n\0";
 
 bool init()
@@ -110,47 +115,36 @@ bool init()
 
     // set up vertex data (and buffer(s)) and configure vertex attributes
     // ------------------------------------------------------------------
-    float verticesFirstTriangle[] = {
-        -0.5f, -0.3f, 0.0f, 0.0f, 1.0f, 0.0f, // left
-        0.0f, 0.7f, 0.0f, 1.0f, 0.0f, 0.0f,   // top
-        0.5f, -0.3f, 0.0f, 0.0f, 0.0f, 1.0f   // right
-    };
+    std::vector<float> vertices;
+    for (int i = 0; i < numPoints; ++i)
+    {
+        float x = -1.0f + 2.0f * i / (numPoints - 1);
+        float y = std::sin(x * M_PI);
+        float r = y < 0 ? 1.0f : 0.0f; // Rojo si y < 0
+        float g = 0.0f;
+        float b = y > 0 ? 1.0f : 0.0f; // Azul si y > 0
+        vertices.push_back(x);
+        vertices.push_back(y);
+        vertices.push_back(r);
+        vertices.push_back(g);
+        vertices.push_back(b);
+    }
 
-    float verticesSecondTriangle[] = {
-        -0.5f, 0.3f, 0.0f, 1.0f, 0.0f, 0.0f, // left
-        0.0f, -0.6f, 0.0f, 1.0f, 0.0f, 0.0f, // top
-        0.5f, 0.3f, 0.0f, 0.0f, 0.0f, 1.0f   // right
-    };
+    glGenVertexArrays(1, &VAO);
+    glGenBuffers(1, &VBO);
 
-    glGenVertexArrays(1, &VAO_FIRST_TRIANGLE);
-    glGenBuffers(1, &VBO_FIRST_TRIANGLE);
+    glBindVertexArray(VAO);
+    glBindBuffer(GL_ARRAY_BUFFER, VBO);
+    glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(float), vertices.data(), GL_STATIC_DRAW);
 
-    glGenVertexArrays(1, &VAO_SECOND_TRIANGLE);
-    glGenBuffers(1, &VBO_SECOND_TRIANGLE);
-
-    // Triangle 1
-    glBindVertexArray(VAO_FIRST_TRIANGLE);
-    glBindBuffer(GL_ARRAY_BUFFER, VBO_FIRST_TRIANGLE);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(verticesFirstTriangle), verticesFirstTriangle, GL_STATIC_DRAW);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void *)0);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void *)0);
     glEnableVertexAttribArray(0);
 
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void *)(3 * sizeof(GLfloat)));
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void *)(2 * sizeof(float)));
     glEnableVertexAttribArray(1);
 
-    // Triangle 2
-    glBindVertexArray(VAO_SECOND_TRIANGLE);
-    glBindBuffer(GL_ARRAY_BUFFER, VBO_SECOND_TRIANGLE);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(verticesSecondTriangle), verticesSecondTriangle, GL_STATIC_DRAW);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void *)0);
-    glEnableVertexAttribArray(0);
-
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void *)(3 * sizeof(GLfloat)));
-    glEnableVertexAttribArray(1);
-
-    // Cleaning up
-    glBindBuffer(GL_ARRAY_BUFFER, NULL);
-    glBindVertexArray(NULL);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindVertexArray(0);
 
     // uncomment this call to draw in wireframe polygons.
     // glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
@@ -168,17 +162,14 @@ void render()
 
         // render
         // ------
-        glClearColor(0.8f, 0.2f, 0.8f, 1.0f);
+        glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
 
         // draw our first triangle
         glUseProgram(shaderProgram);
-        glBindVertexArray(VAO_FIRST_TRIANGLE);
-        glDrawArrays(GL_TRIANGLES, 0, 3);
-
-        // draw our second triangle
-        glBindVertexArray(VAO_SECOND_TRIANGLE);
-        glDrawArrays(GL_TRIANGLES, 0, 3);
+        glEnable(GL_PROGRAM_POINT_SIZE);
+        glBindVertexArray(VAO);
+        glDrawArrays(GL_POINTS, 0, numPoints);
 
         glfwSwapBuffers(window);
         glfwPollEvents();
@@ -186,11 +177,8 @@ void render()
 
     // optional: de-allocate all resources once they've outlived their purpose:
     // ------------------------------------------------------------------------
-    glDeleteVertexArrays(1, &VAO_FIRST_TRIANGLE);
-    glDeleteBuffers(1, &VBO_FIRST_TRIANGLE);
-
-    glDeleteVertexArrays(1, &VAO_SECOND_TRIANGLE);
-    glDeleteBuffers(1, &VBO_SECOND_TRIANGLE);
+    glDeleteVertexArrays(1, &VAO);
+    glDeleteBuffers(1, &VBO);
 
     // glfw: terminate, clearing all previously allocated GLFW resources.
     // ------------------------------------------------------------------
